@@ -1,0 +1,6 @@
+{
+    "id":"sqlite",
+    "description":"Dbagent for Sqlite3",
+    "cross":true,
+	"version":"5.0.1"
+}

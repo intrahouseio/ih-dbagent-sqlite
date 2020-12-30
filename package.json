@@ -1,0 +1,15 @@
+{
+  "name": "ih-dbagent-sqlite3",
+  "version": "5.0.1",
+  "description": "Dbagent for Sqlite3",
+  "main": "dbagent.js",
+  "dependencies": {
+    "sqlite3": "^5.0.0"
+  },
+  "devDependencies": {
+    "mocha": "^4.1.0",
+    "should": "^13.2.3"
+  },
+  "author": "INTRA",
+  "license": "MIT"
+}
