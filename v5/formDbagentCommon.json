@@ -27,7 +27,7 @@
   ],
   "p3": [
     { "prop": "project_options", "title": "Параметры проекта", "type": "header", "size": "h6" },
-    { "prop": "dbPath", "title": "Path db", "type": "input", "default": "/var/lib/ih-v5/projects/${project}/db/hist.db" },
+    { "prop": "dbPath", "title": "Path db", "type": "input", "default": "${projectpath}/db/hist.db" },
     { "prop": "loglevel", "title": "$LogLevel", "type": "droplist", "data": "loglevelList" }
   ],
   "p9": [
