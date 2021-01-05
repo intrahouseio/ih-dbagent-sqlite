@@ -1,8 +1,8 @@
 {
   "grid": [
-    { "id": "p1", "xs": 4, "class": "main", "table": "dbagentinfoTable" },
-    { "id": "p2", "xs": 4, "class": "main", "table": "dbagent" },
-    { "id": "p3", "xs": 4, "class": "main", "table": "dbagent" },
+    { "id": "p1", "xs": 3, "class": "main", "table": "dbagentinfoTable" },
+    { "id": "p2", "xs": 3, "class": "main", "table": "dbagent" },
+    { "id": "p3", "xs": 6, "class": "main", "table": "dbagent" },
     { "id": "p9", "xs": 12, "class": "main", "table": "dbagentstateTable", "hide": "!data.p2.active", "height": "fill" }
   ],
   "spacing": 10,
