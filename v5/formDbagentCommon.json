@@ -23,6 +23,7 @@
   ],
   "p2": [
     { "prop": "sqlite3_options", "title": "Подключение к Sqlite3", "type": "header", "size": "h6" },
+    { "prop": "archDays", "title": "Archive Days", "type": "input", "default": "30" },
     { "prop": "active", "title": "Active", "type": "text", "hide": "1==1" }
   ],
   "p3": [
