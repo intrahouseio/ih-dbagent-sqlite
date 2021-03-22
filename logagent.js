@@ -157,6 +157,6 @@ function getColumns(tableName) {
       return ['unit', 'txt', 'level', 'ts', 'tsid'];
 
     default:
-      return ['unit','unit', 'txt', 'level', 'ts', 'tsid'];
+      return ['part','unit', 'txt', 'level', 'ts', 'tsid'];
   }
 }
