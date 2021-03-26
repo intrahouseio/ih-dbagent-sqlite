@@ -11,6 +11,7 @@
 
 const util = require('util');
 const path = require('path');
+const schedule = require('node-schedule');
 
 const logger = require('./logger');
 const client = require('./lib/client');
@@ -46,6 +47,7 @@ async function main(channel) {
     await client.createTable(getCreateTableStr('mainlog'), 'mainlog');
     await client.createTable(getCreateTableStr('pluginlog'), 'pluginlog');
     await client.createTable(getCreateTableStr('devicelog'), 'devicelog');
+
     await client.run('CREATE INDEX IF NOT EXISTS mainlog_ts ON mainlog (tsid);');
     await client.run('CREATE INDEX IF NOT EXISTS devicelog_ts ON devicelog (tsid);');
     await client.run('CREATE INDEX IF NOT EXISTS pluginlog_ts ON pluginlog (tsid);');
@@ -53,7 +55,16 @@ async function main(channel) {
     channel.on('message', ({ id, type, query, payload }) => {
       if (type == 'write') return write(id, query, payload);
       if (type == 'read') return read(id, query);
-      // if (type == 'settings') return del(payload);
+      if (type == 'settings') return del(payload);
+    });
+
+    send({ id: 'settings', type: 'settings' });
+
+    const hoursRule = new schedule.RecurrenceRule();
+    hoursRule.rule = '7 0 * * * *';
+
+    schedule.scheduleJob(hoursRule, () => {
+      send({ id: 'settings', type: 'settings' });
     });
 
     process.on('SIGTERM', () => {
@@ -102,6 +113,52 @@ async function main(channel) {
       send({ id, query: queryObj, payload: result });
     } catch (err) {
       sendError(id, err);
+    }
+  }
+
+  // {devicelog:[{_id, days}], pluginlog:{_id,days}}
+  async function del(payload) {
+    if (!payload || !payload.rp) return;
+
+    if (payload.rp.devicelog) {
+      await deleteFromTable('devicelog', payload.rp.devicelog, 'did');
+    }
+    if (payload.rp.pluginlog) {
+      await deleteFromTable('pluginlog', payload.rp.pluginlog, 'unit');
+    }
+  }
+
+  async function deleteFromTable(tableName, rpArr, prop) {
+    let i = 0;
+    let days = 0;
+    let arr = [];
+    while (i < rpArr.length) {
+      const item = rpArr[i];
+      if (item.days != days) {
+        if (days) await deleteRecords(tableName, days, arr, prop);
+        days = item.days;
+        arr = [];
+      }
+
+      arr.push(item);
+      i++;
+    }
+    await deleteRecords(tableName, days, arr, prop);
+  }
+
+  async function deleteRecords(tableName, archDay, arr, prop) {
+    if (!arr.length) return;
+   
+    const archDepth = archDay * 86400000;
+    const delTime = Date.now() - archDepth;
+    const values = arr.map(item => `${prop}='${item._id}'`).join(' OR ');
+    const sql = `DELETE FROM ${tableName} WHERE (${values}) AND ts<${delTime}`;
+    
+    try {
+      const changes = await client.run(sql);
+      logger.log(`${tableName}  Archday=${archDay}  Row(s) deleted ${changes}`, 1);
+    } catch (err) {
+      sendError('delete', err);
     }
   }
 
@@ -157,6 +214,6 @@ function getColumns(tableName) {
       return ['unit', 'txt', 'level', 'ts', 'tsid'];
 
     default:
-      return ['part','unit', 'txt', 'level', 'ts', 'tsid'];
+      return ['part', 'unit', 'txt', 'level', 'ts', 'tsid'];
   }
 }
