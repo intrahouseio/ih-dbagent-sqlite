@@ -55,6 +55,7 @@ async function main(channel) {
     channel.on('message', ({ id, type, query, payload }) => {
       if (type == 'write') return write(id, query, payload);
       if (type == 'read') return read(id, query);
+      if (type == 'run') return run(id, query);
       if (type == 'settings') return del(payload);
     });
 
@@ -116,6 +117,18 @@ async function main(channel) {
     }
   }
 
+  async function run(id, queryObj) {
+    try {
+      const sql = queryObj.sql ? queryObj.sql : '';
+      if (!sql) throw { message: 'Missing query.sql in run query: ' + util.inspect(queryObj) };
+
+      const changes = await client.run(sql);
+      logger.log(`${sql}  Row(s) affected: ${changes}`, 1);
+    } catch (err) {
+      sendError(id, err);
+    }
+  }
+
   // {devicelog:[{_id, days}], pluginlog:{_id,days}}
   async function del(payload) {
     if (!payload || !payload.rp) return;
@@ -148,12 +161,12 @@ async function main(channel) {
 
   async function deleteRecords(tableName, archDay, arr, prop) {
     if (!arr.length) return;
-   
+
     const archDepth = archDay * 86400000;
     const delTime = Date.now() - archDepth;
     const values = arr.map(item => `${prop}='${item._id}'`).join(' OR ');
     const sql = `DELETE FROM ${tableName} WHERE (${values}) AND ts<${delTime}`;
-    
+
     try {
       const changes = await client.run(sql);
       logger.log(`${tableName}  Archday=${archDay}  Row(s) deleted ${changes}`, 1);
@@ -194,13 +207,13 @@ function getCreateTableStr(tableName) {
   let result;
   switch (tableName) {
     case 'devicelog':
-      result = 'did TEXT,prop TEXT,val TEXT,ts INTEGER NOT NULL,tsid TEXT,cmd TEXT,login TEXT';
+      result = 'did TEXT,prop TEXT,val TEXT,txt TEXT, ts INTEGER NOT NULL,tsid TEXT,cmd TEXT,sender TEXT';
       break;
     case 'pluginlog':
-      result = 'ts INTEGER NOT NULL,tsid TEXT,unit TEXT,txt TEXT,level INTEGER';
+      result = 'unit TEXT, txt TEXT,level INTEGER, ts INTEGER NOT NULL, tsid TEXT, sender TEXT';
       break;
     default:
-      result = 'ts INTEGER NOT NULL,tsid TEXT,unit TEXT,txt TEXT,level INTEGER';
+      result = 'tags TEXT, did TEXT, location TEXT, txt TEXT, level INTEGER, ts INTEGER NOT NULL,tsid TEXT,sender TEXT';
   }
   return 'CREATE TABLE IF NOT EXISTS ' + tableName + ' (' + result + ')';
 }
@@ -208,12 +221,12 @@ function getCreateTableStr(tableName) {
 function getColumns(tableName) {
   switch (tableName) {
     case 'devicelog':
-      return ['did', 'prop', 'val', 'ts', 'tsid', 'cmd', 'login'];
+      return ['did', 'prop', 'val', 'txt', 'ts', 'tsid', 'cmd', 'sender'];
 
     case 'pluginlog':
-      return ['unit', 'txt', 'level', 'ts', 'tsid'];
+      return ['unit', 'txt', 'level', 'ts', 'tsid', 'sender'];
 
     default:
-      return ['part', 'unit', 'txt', 'level', 'ts', 'tsid'];
+      return ['tags', 'did', 'location', 'txt', 'level', 'ts', 'tsid', 'sender'];
   }
 }
