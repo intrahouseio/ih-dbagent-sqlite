@@ -17,6 +17,8 @@ const logger = require('./logger');
 const client = require('./lib/client');
 const utils = require('./lib/utils');
 
+const tableNames = ['mainlog', 'pluginlog', 'devicelog', 'authlog'];
+
 let opt;
 try {
   opt = JSON.parse(process.argv[2]);
@@ -44,6 +46,7 @@ async function main(channel) {
     await client.run('PRAGMA journal_mode = WAL;');
     await client.run('PRAGMA synchronous = NORMAL;');
 
+    /*  
     await client.createTable(getCreateTableStr('mainlog'), 'mainlog');
     await client.createTable(getCreateTableStr('pluginlog'), 'pluginlog');
     await client.createTable(getCreateTableStr('devicelog'), 'devicelog');
@@ -51,6 +54,11 @@ async function main(channel) {
     await client.run('CREATE INDEX IF NOT EXISTS mainlog_ts ON mainlog (tsid);');
     await client.run('CREATE INDEX IF NOT EXISTS devicelog_ts ON devicelog (tsid);');
     await client.run('CREATE INDEX IF NOT EXISTS pluginlog_ts ON pluginlog (tsid);');
+*/
+    for (const name of tableNames) {
+      await client.createTable(getCreateTableStr(name), name);
+      await client.run('CREATE INDEX IF NOT EXISTS ' + name + '_ts ON ' + name + ' (tsid);');
+    }
 
     channel.on('message', ({ id, type, query, payload }) => {
       if (type == 'write') return write(id, query, payload);
@@ -129,47 +137,29 @@ async function main(channel) {
     }
   }
 
-  // {devicelog:[{_id, days}], pluginlog:{_id,days}}
+  // {devicelog:[{level, days},..], pluginlog:{level,days}}
   async function del(payload) {
-    if (!payload || !payload.rp) return;
-
-    if (payload.rp.devicelog) {
-      await deleteFromTable('devicelog', payload.rp.devicelog, 'did');
-    }
-    if (payload.rp.pluginlog) {
-      await deleteFromTable('pluginlog', payload.rp.pluginlog, 'unit');
-    }
-  }
-
-  async function deleteFromTable(tableName, rpArr, prop) {
-    let i = 0;
-    let days = 0;
-    let arr = [];
-    while (i < rpArr.length) {
-      const item = rpArr[i];
-      if (item.days != days) {
-        if (days) await deleteRecords(tableName, days, arr, prop);
-        days = item.days;
-        arr = [];
+    if (!payload || !payload.rp || typeof payload.rp != 'object') return;
+    for (const name of Object.keys(payload.rp)) {
+      // Если есть такая таблица - обработать
+      if (tableNames.includes(name)) {
+        const arr = payload.rp[name];
+        for (const item of arr) {
+          await deleteRecordsByLevel(name, item.days, item.level);
+        }
       }
-
-      arr.push(item);
-      i++;
     }
-    await deleteRecords(tableName, days, arr, prop);
   }
 
-  async function deleteRecords(tableName, archDay, arr, prop) {
-    if (!arr.length) return;
-
+  async function deleteRecordsByLevel(tableName, archDay, level) {
     const archDepth = archDay * 86400000;
     const delTime = Date.now() - archDepth;
-    const values = arr.map(item => `${prop}='${item._id}'`).join(' OR ');
-    const sql = `DELETE FROM ${tableName} WHERE (${values}) AND ts<${delTime}`;
+
+    const sql = `DELETE FROM ${tableName} WHERE level = ${level} AND ts<${delTime}`;
 
     try {
       const changes = await client.run(sql);
-      logger.log(`${tableName}  Archday=${archDay}  Row(s) deleted ${changes}`, 1);
+      logger.log(`${tableName}  Level=${level} Archday=${archDay}  Row(s) deleted ${changes}`, 1);
     } catch (err) {
       sendError('delete', err);
     }
