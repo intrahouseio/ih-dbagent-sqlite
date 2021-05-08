@@ -16,7 +16,7 @@ const logger = require('./logger');
 // Извлечь имя log или писать в /var/log
 let opt;
 try {
-  opt = JSON.parse(process.argv[2]); //dbPath property
+  opt = JSON.parse(process.argv[2]); // dbPath property
 } catch (e) {
   opt = {};
 }
@@ -30,7 +30,17 @@ logger.log('Start dbagent sqlite3. Loglevel: '+loglevel);
 delete opt.logfile;
 delete opt.loglevel;
 
+sendProcessInfo();
+setInterval(sendProcessInfo, 10000);
 dbagent(process, opt, logger);
+
+function sendProcessInfo() {
+  const mu = process.memoryUsage();
+  const memrss = Math.floor(mu.rss/1024)
+  const memheap = Math.floor(mu.heapTotal/1024)
+  const memhuse = Math.floor(mu.heapUsed/1024)
+  process.send({type:'procinfo', data:{memrss,memheap, memhuse }});
+}
 
 
 

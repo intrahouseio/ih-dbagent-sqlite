@@ -31,6 +31,9 @@ const loglevel = opt.loglevel || 0;
 logger.start(logfile, loglevel);
 logger.log('Start logagent sqlite3. Options: ' + JSON.stringify(opt));
 
+sendProcessInfo();
+setInterval(sendProcessInfo, 10000);
+
 main(process);
 
 async function main(channel) {
@@ -219,4 +222,12 @@ function getColumns(tableName) {
     default:
       return ['tags', 'did', 'location', 'txt', 'level', 'ts', 'tsid', 'sender'];
   }
+}
+
+function sendProcessInfo() {
+  const mu = process.memoryUsage();
+  const memrss = Math.floor(mu.rss/1024)
+  const memheap = Math.floor(mu.heapTotal/1024)
+  const memhuse = Math.floor(mu.heapUsed/1024)
+  process.send({type:'procinfo', data:{state:1, memrss,memheap, memhuse }});
 }
