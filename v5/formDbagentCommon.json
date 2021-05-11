@@ -1,14 +1,15 @@
 {
   "grid": [
-    { "id": "p1", "xs": 3, "class": "main", "table": "dbagentinfoTable" },
-    { "id": "p2", "xs": 3, "class": "main", "table": "dbagent" },
-    { "id": "p3", "xs": 6, "class": "main", "table": "dbagent" },
-    { "id": "p9", "xs": 12, "class": "main", "table": "dbagentstateTable", "hide": "!data.p2.active", "height": "fill" }
+    { "id": "p1", "xs": 4, "class": "main", "table": "dbagentinfoTable" },
+
+    { "id": "p3", "xs": 8, "class": "main", "table": "dbagent" },
+    { "id": "p9", "xs": 12, "class": "main", "table": "dbagentstateTable", "hide": "!data.p3.active", "height": "fill" }
   ],
   "spacing": 10,
   "breadcrumbs": { "tree": "dbagents" },
 
   "p1": [
+  
     { "prop": "description", "title": "", "type": "text" },
     { "prop": "version", "title": "$Version", "type": "text" },
 
@@ -18,15 +19,12 @@
       "type": "button",
       "command": "restart",
       "param": "dbagent",
-      "hide": "data.p2.active"
+      "hide": "data.p3.active"
     }
   ],
-  "p2": [
-    { "prop": "sqlite3_options", "title": "Подключение к Sqlite3", "type": "header", "size": "h6" },
-    { "prop": "archDays", "title": "Archive Days", "type": "input", "default": "30" },
-    { "prop": "active", "title": "Active", "type": "text", "hide": "1==1" }
-  ],
+  
   "p3": [
+    { "prop": "active", "title": "Active", "type": "text", "hide": "1==1" },
     { "prop": "project_options", "title": "Параметры проекта", "type": "header", "size": "h6" },
     { "prop": "dbPath", "title": "Path db", "type": "input", "default": "${projectpath}/db/hist.db" },
     { "prop": "loglevel", "title": "$LogLevel", "type": "droplist", "data": "loglevelList" }
