@@ -25,7 +25,8 @@ const logfile = opt.logfile || path.join(__dirname,'ih_sqlite3.log');
 const loglevel = opt.loglevel || 0;
 
 logger.start(logfile,loglevel);
-logger.log('Start dbagent sqlite3. Loglevel: '+loglevel);
+
+logger.log('Start dbagent sqlite3. Options: ' + JSON.stringify(opt));
 
 delete opt.logfile;
 delete opt.loglevel;
@@ -39,7 +40,7 @@ function sendProcessInfo() {
   const memrss = Math.floor(mu.rss/1024)
   const memheap = Math.floor(mu.heapTotal/1024)
   const memhuse = Math.floor(mu.heapUsed/1024)
-  process.send({type:'procinfo', data:{memrss,memheap, memhuse }});
+  if (process.connected) process.send({type:'procinfo', data:{memrss,memheap, memhuse }});
 }
 
 

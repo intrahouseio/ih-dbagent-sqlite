@@ -229,5 +229,5 @@ function sendProcessInfo() {
   const memrss = Math.floor(mu.rss/1024)
   const memheap = Math.floor(mu.heapTotal/1024)
   const memhuse = Math.floor(mu.heapUsed/1024)
-  process.send({type:'procinfo', data:{state:1, memrss,memheap, memhuse }});
+  if (process.connected) process.send({type:'procinfo', data:{state:1, memrss,memheap, memhuse }});
 }
