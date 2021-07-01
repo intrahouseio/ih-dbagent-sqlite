@@ -11,7 +11,7 @@ const path = require('path');
 
 const dbagent = require('./lib/index');
 const logger = require('./logger');
-
+const { promises: fs } = require('fs');
 
 // Извлечь имя log или писать в /var/log
 let opt;
@@ -33,15 +33,26 @@ delete opt.loglevel;
 
 sendProcessInfo();
 setInterval(sendProcessInfo, 10000);
+setInterval(async () => sendDBSize(), 60000);
 dbagent(process, opt, logger);
 
 function sendProcessInfo() {
   const mu = process.memoryUsage();
-  const memrss = Math.floor(mu.rss/1024)
-  const memheap = Math.floor(mu.heapTotal/1024)
-  const memhuse = Math.floor(mu.heapUsed/1024)
+  const memrss = Math.floor(mu.rss/1024);
+  const memheap = Math.floor(mu.heapTotal/1024);
+  const memhuse = Math.floor(mu.heapUsed/1024);
+
   if (process.connected) process.send({type:'procinfo', data:{memrss,memheap, memhuse }});
 }
 
+async function sendDBSize() {
+  let stats = await fs.stat(opt.dbPath);
+  let fileSize = stats["size"]/1048576;
+  stats = await fs.stat(opt.dbPath+"-shm");
+  fileSize = fileSize + stats["size"]/1048576;
+  stats = await fs.stat(opt.dbPath+"-wal");
+  fileSize = fileSize + stats["size"]/1048576;  
+  if (process.connected) process.send({type:'procinfo', data:{size: Math.round(fileSize*100)/100}});
+}
 
 
