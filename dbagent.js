@@ -17,6 +17,7 @@ const { promises: fs } = require('fs');
 let opt;
 try {
   opt = JSON.parse(process.argv[2]); // dbPath property
+  opt.dbLimit = 1024;
 } catch (e) {
   opt = {};
 }
@@ -33,7 +34,6 @@ delete opt.loglevel;
 
 sendProcessInfo();
 setInterval(sendProcessInfo, 10000);
-setInterval(async () => sendDBSize(), 60000);
 dbagent(process, opt, logger);
 
 function sendProcessInfo() {
@@ -45,14 +45,5 @@ function sendProcessInfo() {
   if (process.connected) process.send({type:'procinfo', data:{memrss,memheap, memhuse }});
 }
 
-async function sendDBSize() {
-  let stats = await fs.stat(opt.dbPath);
-  let fileSize = stats["size"]/1048576;
-  stats = await fs.stat(opt.dbPath+"-shm");
-  fileSize = fileSize + stats["size"]/1048576;
-  stats = await fs.stat(opt.dbPath+"-wal");
-  fileSize = fileSize + stats["size"]/1048576;  
-  if (process.connected) process.send({type:'procinfo', data:{size: Math.round(fileSize*100)/100}});
-}
 
 

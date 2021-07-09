@@ -1,3 +1,9 @@
 {
-    "ext": [{ "prop": "size", "note": "DB size Mb", "vtype": "N" }]
+    "ext": [{ "prop": "size", "note": "DB size Mb", "vtype": "N" },
+            { "prop": "overflow", "note": "Overflow", "vtype": "N" },
+            { "prop": "lastMaxTimeWrite", "note": "Last Max Time Write", "vtype": "N" },
+            { "prop": "lastMaxCountWrite", "note": "Last Max Count Write", "vtype": "N" },
+            { "prop": "lastMaxTimeRead", "note": "Last Max Time Read", "vtype": "N" },
+            { "prop": "lastMaxCountRead", "note": "Last Max Count Read", "vtype": "N" }
+        ]
   }

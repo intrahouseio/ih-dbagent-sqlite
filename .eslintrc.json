@@ -1,10 +1,15 @@
 {
-  "extends": ["airbnb","prettier"],
+  "extends": [],
   
-  "parser": "babel-eslint",
-  
+  "parser": "",
+
+  "parserOptions": {
+    "ecmaVersion": 2017
+    },
+    
   "env": {
-    "browser": false
+    "browser": false,
+    "es6": true
     },
   
    "rules": {
