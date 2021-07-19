@@ -26,7 +26,6 @@
   "p3": [
     { "prop": "active", "title": "Active", "type": "text", "hide": "1==1" },
     { "prop": "project_options", "title": "Параметры проекта", "type": "header", "size": "h6" },
-    { "prop": "dbPath", "title": "Текущий путь к БД", "type": "text" },
     { "prop": "dbLimit", "title": "Лимит в МБ", "type": "input", "default": 1024},
     { "prop": "alone", "title": "Хранить БД отдельно от проекта", "type": "cb" },
     { "prop": "alonePath", "title": "Путь к папке для БД", "type": "input", "hide": "!data.p3.alone" },

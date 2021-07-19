@@ -17,7 +17,7 @@ const { promises: fs } = require('fs');
 let opt;
 try {
   opt = JSON.parse(process.argv[2]); // dbPath property
-  opt.dbLimit = 1024;
+  // opt.dbLimit = 1024;
 } catch (e) {
   opt = {};
 }
