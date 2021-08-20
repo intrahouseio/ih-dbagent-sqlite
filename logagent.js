@@ -11,7 +11,7 @@
 
 const util = require('util');
 const path = require('path');
-const schedule = require('node-schedule');
+// const schedule = require('node-schedule');
 const { promises: fs } = require('fs');
 
 const logger = require('./logger');
@@ -33,8 +33,11 @@ logger.start(logfile, loglevel);
 logger.log('Start logagent sqlite3. Options: ' + JSON.stringify(opt));
 
 sendProcessInfo();
-setInterval(sendProcessInfo, 10000);
-setInterval(async () => sendDBSize(), 60000);
+setInterval(sendProcessInfo, 10000); // 10 сек
+setInterval(async () => sendDBSize(), 60000); // 60 сек
+
+sendSettingsRequest();
+setInterval(sendSettingsRequest, 10800000); // 3 часа = 10800 сек
 
 main(process);
 
@@ -51,15 +54,6 @@ async function main(channel) {
     await client.run('PRAGMA journal_mode = WAL;');
     await client.run('PRAGMA synchronous = NORMAL;');
 
-    /*  
-    await client.createTable(getCreateTableStr('mainlog'), 'mainlog');
-    await client.createTable(getCreateTableStr('pluginlog'), 'pluginlog');
-    await client.createTable(getCreateTableStr('devicelog'), 'devicelog');
-
-    await client.run('CREATE INDEX IF NOT EXISTS mainlog_ts ON mainlog (tsid);');
-    await client.run('CREATE INDEX IF NOT EXISTS devicelog_ts ON devicelog (tsid);');
-    await client.run('CREATE INDEX IF NOT EXISTS pluginlog_ts ON pluginlog (tsid);');
-*/
     for (const name of tableNames) {
       await client.createTable(getCreateTableStr(name), name);
       await client.run('CREATE INDEX IF NOT EXISTS ' + name + '_ts ON ' + name + ' (tsid);');
@@ -70,15 +64,6 @@ async function main(channel) {
       if (type == 'read') return read(id, query);
       if (type == 'run') return run(id, query);
       if (type == 'settings') return del(payload);
-    });
-
-    send({ id: 'settings', type: 'settings' });
-
-    const hoursRule = new schedule.RecurrenceRule();
-    hoursRule.rule = '7 0 * * * *';
-
-    schedule.scheduleJob(hoursRule, () => {
-      send({ id: 'settings', type: 'settings' });
     });
 
     process.on('SIGTERM', () => {
@@ -228,18 +213,22 @@ function getColumns(tableName) {
 
 function sendProcessInfo() {
   const mu = process.memoryUsage();
-  const memrss = Math.floor(mu.rss/1024)
-  const memheap = Math.floor(mu.heapTotal/1024)
-  const memhuse = Math.floor(mu.heapUsed/1024)
-  if (process.connected) process.send({type:'procinfo', data:{state:1, memrss,memheap, memhuse }});
+  const memrss = Math.floor(mu.rss / 1024);
+  const memheap = Math.floor(mu.heapTotal / 1024);
+  const memhuse = Math.floor(mu.heapUsed / 1024);
+  if (process.connected) process.send({ type: 'procinfo', data: { state: 1, memrss, memheap, memhuse } });
 }
 
 async function sendDBSize() {
   let stats = await fs.stat(opt.dbPath);
-  let fileSize = stats["size"]/1048576;
-  stats = await fs.stat(opt.dbPath+"-shm");
-  fileSize = fileSize + stats["size"]/1048576;
-  stats = await fs.stat(opt.dbPath+"-wal");
-  fileSize = fileSize + stats["size"]/1048576;  
-  if (process.connected) process.send({type:'procinfo', data:{size: Math.round(fileSize*100)/100}});
+  let fileSize = stats['size'] / 1048576;
+  stats = await fs.stat(opt.dbPath + '-shm');
+  fileSize = fileSize + stats['size'] / 1048576;
+  stats = await fs.stat(opt.dbPath + '-wal');
+  fileSize = fileSize + stats['size'] / 1048576;
+  if (process.connected) process.send({ type: 'procinfo', data: { size: Math.round(fileSize * 100) / 100 } });
+}
+
+function sendSettingsRequest() {
+  if (process.connected) process.send({ id: 'settings', type: 'settings' });
 }
