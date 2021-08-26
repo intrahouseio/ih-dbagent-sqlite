@@ -57,6 +57,11 @@ async function main(channel) {
     for (const name of tableNames) {
       await client.createTable(getCreateTableStr(name), name);
       await client.run('CREATE INDEX IF NOT EXISTS ' + name + '_ts ON ' + name + ' (tsid);');
+      const result = await client.query('SELECT Count (*) count From ' + name);
+      logger.log(name + ': ' + (result ? result[0].count + ' records' : ' No result'));
+      if (result && result[0].count > 1000) {
+        await showGroups(name);
+      }
     }
 
     channel.on('message', ({ id, type, query, payload }) => {
@@ -76,6 +81,11 @@ async function main(channel) {
     });
   } catch (err) {
     processExit(1, err);
+  }
+
+  async function showGroups(name) {
+    const result = await client.query(getGroupQuery(name));
+    logger.log(name + ' group: ' + util.inspect(result));
   }
 
   /**
@@ -208,6 +218,19 @@ function getColumns(tableName) {
 
     default:
       return ['tags', 'did', 'location', 'txt', 'level', 'ts', 'tsid', 'sender'];
+  }
+}
+
+function getGroupQuery(tableName) {
+  switch (tableName) {
+    case 'devicelog':
+      return 'SELECT did, Count (tsid) count from devicelog group by did';
+
+    case 'pluginlog':
+      return 'SELECT unit, Count (tsid) count from pluginlog group by unit';
+
+    default:
+      return 'SELECT level, Count (tsid) count from ' + tableName + ' group by level';
   }
 }
 
