@@ -34,7 +34,6 @@ logger.log('Start logagent sqlite3. Options: ' + JSON.stringify(opt));
 
 sendProcessInfo();
 setInterval(sendProcessInfo, 10000); // 10 сек
-setInterval(async () => sendDBSize(), 60000); // 60 сек
 
 sendSettingsRequest();
 setInterval(sendSettingsRequest, 10800000); // 3 часа = 10800 сек
@@ -57,12 +56,10 @@ async function main(channel) {
     for (const name of tableNames) {
       await client.createTable(getCreateTableStr(name), name);
       await client.run('CREATE INDEX IF NOT EXISTS ' + name + '_ts ON ' + name + ' (tsid);');
-      const result = await client.query('SELECT Count (*) count From ' + name);
-      logger.log(name + ': ' + (result ? result[0].count + ' records' : ' No result'));
-      if (result && result[0].count > 1000) {
-        await showGroups(name);
-      }
     }
+    
+    sendDBSize(); // Отправить статистику первый раз
+    setInterval(async () => sendDBSize(), 300000); // 300 сек = 5 мин
 
     channel.on('message', ({ id, type, query, payload }) => {
       if (type == 'write') return write(id, query, payload);
@@ -131,7 +128,7 @@ async function main(channel) {
       if (!sql) throw { message: 'Missing query.sql in run query: ' + util.inspect(queryObj) };
 
       const changes = await client.run(sql);
-      logger.log(`${sql}  Row(s) affected: ${changes}`, 1);
+      logger.log(`${sql}  Row(s) affected: ${changes}`, 2);
     } catch (err) {
       sendError(id, err);
     }
@@ -189,6 +186,31 @@ async function main(channel) {
       channel.exit(code);
     }, 500);
   }
+
+  async function sendDBSize() {
+    if (!process.connected) return;
+    
+    const data = {};
+    let stats = await fs.stat(opt.dbPath);
+    let fileSize = stats['size'] / 1048576;
+    stats = await fs.stat(opt.dbPath + '-shm');
+    fileSize = fileSize + stats['size'] / 1048576;
+    stats = await fs.stat(opt.dbPath + '-wal');
+    fileSize = fileSize + stats['size'] / 1048576;
+    data.size = Math.round(fileSize * 100) / 100;
+  
+    for (const name of tableNames) {
+      const result = await client.query('SELECT Count (*) count From ' + name);
+      const count = result ? result[0].count : 0;
+      if (count > 1000) {
+        await showGroups(name);
+      }
+      data[name] = count;
+    }
+  
+    if (process.connected) process.send({ type: 'procinfo', data });
+  }
+  
 }
 
 // Частные функции
@@ -242,15 +264,6 @@ function sendProcessInfo() {
   if (process.connected) process.send({ type: 'procinfo', data: { state: 1, memrss, memheap, memhuse } });
 }
 
-async function sendDBSize() {
-  let stats = await fs.stat(opt.dbPath);
-  let fileSize = stats['size'] / 1048576;
-  stats = await fs.stat(opt.dbPath + '-shm');
-  fileSize = fileSize + stats['size'] / 1048576;
-  stats = await fs.stat(opt.dbPath + '-wal');
-  fileSize = fileSize + stats['size'] / 1048576;
-  if (process.connected) process.send({ type: 'procinfo', data: { size: Math.round(fileSize * 100) / 100 } });
-}
 
 function sendSettingsRequest() {
   if (process.connected) process.send({ id: 'settings', type: 'settings' });

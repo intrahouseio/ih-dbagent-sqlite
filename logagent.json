@@ -1,3 +1,8 @@
 {
-    "ext": [{ "prop": "size", "note": "DB size Mb", "vtype": "N" }]
+    "ext": [
+      { "prop": "size", "note": "DB size Mb", "vtype": "N" },
+      { "prop": "mainlog", "note": "Mainlog : number of records", "vtype": "N" },
+      { "prop": "pluginlog", "note": "Pluginlog : number of records", "vtype": "N" },
+      { "prop": "devicelog", "note": "Devicelog : number of records", "vtype": "N" }
+    ]
   }
