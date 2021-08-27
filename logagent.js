@@ -29,6 +29,7 @@ try {
 
 const logfile = opt.logfile || path.join(__dirname, 'ih_sqlite3_logagent.log');
 const loglevel = opt.loglevel || 0;
+const maxlogrecords = opt.maxlogrecords || 100000;
 logger.start(logfile, loglevel);
 logger.log('Start logagent sqlite3. Options: ' + JSON.stringify(opt));
 
@@ -57,7 +58,7 @@ async function main(channel) {
       await client.createTable(getCreateTableStr(name), name);
       await client.run('CREATE INDEX IF NOT EXISTS ' + name + '_ts ON ' + name + ' (tsid);');
     }
-    
+
     sendDBSize(); // Отправить статистику первый раз
     setInterval(async () => sendDBSize(), 300000); // 300 сек = 5 мин
 
@@ -162,6 +163,22 @@ async function main(channel) {
     }
   }
 
+  async function deleteRecordsMax(tableName) {
+    // Оставляем только данные за 1 день
+    const archDepth = 1 * 86400000;
+    const delTime = Date.now() - archDepth;
+
+    const sql = `DELETE FROM ${tableName} WHERE ts<${delTime}`;
+    const mes = 'Number of records exceeded ' + maxlogrecords + '!! All except the last day data was deleted!!';
+
+    try {
+      const changes = await client.run(sql);
+      logger.log(`${tableName}  ${mes} Row(s) deleted ${changes}`, 1);
+    } catch (err) {
+      sendError('delete', err);
+    }
+  }
+
   function send(message) {
     channel.send(message);
   }
@@ -189,7 +206,7 @@ async function main(channel) {
 
   async function sendDBSize() {
     if (!process.connected) return;
-    
+
     const data = {};
     let stats = await fs.stat(opt.dbPath);
     let fileSize = stats['size'] / 1048576;
@@ -198,19 +215,33 @@ async function main(channel) {
     stats = await fs.stat(opt.dbPath + '-wal');
     fileSize = fileSize + stats['size'] / 1048576;
     data.size = Math.round(fileSize * 100) / 100;
-  
+
+    const needDelete = [];
     for (const name of tableNames) {
-      const result = await client.query('SELECT Count (*) count From ' + name);
-      const count = result ? result[0].count : 0;
+      // const result = await client.query('SELECT Count (*) count From ' + name);
+      // const count = result ? result[0].count : 0;
+      const count = await getTableRecordsCount(name);
       if (count > 1000) {
         await showGroups(name);
       }
       data[name] = count;
+      if (maxlogrecords > 0 && count > maxlogrecords && name != 'mainlog') needDelete.push(name);
     }
-  
+
+    // Отправить фактическое состояние
     if (process.connected) process.send({ type: 'procinfo', data });
+
+    if (!needDelete.length) return;
+
+    for (const name of needDelete) {
+      await deleteRecordsMax(name);
+    }
   }
-  
+
+  async function getTableRecordsCount(name) {
+    const result = await client.query('SELECT Count (*) count From ' + name);
+    return result ? result[0].count : 0;
+  }
 }
 
 // Частные функции
@@ -263,7 +294,6 @@ function sendProcessInfo() {
   const memhuse = Math.floor(mu.heapUsed / 1024);
   if (process.connected) process.send({ type: 'procinfo', data: { state: 1, memrss, memheap, memhuse } });
 }
-
 
 function sendSettingsRequest() {
   if (process.connected) process.send({ id: 'settings', type: 'settings' });
