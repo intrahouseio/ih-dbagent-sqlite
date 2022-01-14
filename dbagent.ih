@@ -2,5 +2,5 @@
     "id":"sqlite",
     "description":"Dbagent for Sqlite3",
     "cross":true,
-	"version":"5.5.20"
+	"version":"5.0.19"
 }
