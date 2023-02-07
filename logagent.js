@@ -53,7 +53,8 @@ async function main(channel) {
 
     await client.run('PRAGMA journal_mode = WAL;');
     await client.run('PRAGMA synchronous = NORMAL;');
-
+    await client.run('PRAGMA auto_vacuum = FULL;');
+    
     for (const name of tableNames) {
       await client.createTable(getCreateTableStr(name), name);
       await client.run('CREATE INDEX IF NOT EXISTS ' + name + '_ts ON ' + name + ' (tsid);');
