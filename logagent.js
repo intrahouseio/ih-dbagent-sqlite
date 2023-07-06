@@ -18,7 +18,7 @@ const logger = require('./logger');
 const client = require('./lib/client');
 const utils = require('./lib/utils');
 
-const tableNames = ['mainlog', 'pluginlog', 'devicelog', 'authlog'];
+const tableNames = ['mainlog', 'pluginlog', 'devicelog', 'iseclog'];
 
 let opt;
 try {
@@ -56,8 +56,12 @@ async function main(channel) {
     await client.run('PRAGMA auto_vacuum = FULL;');
     
     for (const name of tableNames) {
-      await client.createTable(getCreateTableStr(name), name);
-      await client.run('CREATE INDEX IF NOT EXISTS ' + name + '_ts ON ' + name + ' (tsid);');
+      try {
+        await client.createTable(getCreateTableStr(name), name);
+        await client.run('CREATE INDEX IF NOT EXISTS ' + name + '_ts ON ' + name + ' (tsid);');
+      } catch (e) {
+        logger.log('ERROR: '+util.inspect(e));
+      }
     }
 
     sendDBSize(); // Отправить статистику первый раз
@@ -94,6 +98,7 @@ async function main(channel) {
    * @param {Array of Objects} payload - [{ dn, prop, ts, val }]
    */
   async function write(id, queryObj, payload) {
+   
     const table = queryObj && queryObj.table ? queryObj.table : 'mainlog';
     const columns = getColumns(table);
     const values = utils.formValues(payload, columns);
@@ -256,6 +261,11 @@ function getCreateTableStr(tableName) {
     case 'pluginlog':
       result = 'unit TEXT, txt TEXT,level INTEGER, ts INTEGER NOT NULL, tsid TEXT, sender TEXT';
       break;
+
+    case 'iseclog':
+      result = 'type TEXT, msg TEXT, subjid TEXT, subjname TEXT, result TEXT, changed TEXT, ip TEXT, class TEXT, app TEXT, version TEXT, objid TEXT, objname TEXT, level INTEGER, ts INTEGER NOT NULL, tsid TEXT,sender TEXT';
+      break;
+
     default:
       result = 'tags TEXT, did TEXT, location TEXT, txt TEXT, level INTEGER, ts INTEGER NOT NULL,tsid TEXT,sender TEXT';
   }
@@ -270,6 +280,9 @@ function getColumns(tableName) {
     case 'pluginlog':
       return ['unit', 'txt', 'level', 'ts', 'tsid', 'sender'];
 
+    case 'iseclog':
+        return ['type', 'msg', 'subjid', 'subjname','objid', 'objname','result','changed','ip','app','class','version','level', 'ts', 'tsid', 'sender'];
+     
     default:
       return ['tags', 'did', 'location', 'txt', 'level', 'ts', 'tsid', 'sender'];
   }
