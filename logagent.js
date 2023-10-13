@@ -227,9 +227,9 @@ async function main(channel) {
       // const result = await client.query('SELECT Count (*) count From ' + name);
       // const count = result ? result[0].count : 0;
       const count = await getTableRecordsCount(name);
-      if (count > 1000) {
-        await showGroups(name);
-      }
+      // if (count > 1000) {
+      //  await showGroups(name);
+      // }
       data[name] = count;
       if (maxlogrecords > 0 && count > maxlogrecords && name != 'mainlog') needDelete.push(name);
     }
