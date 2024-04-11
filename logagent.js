@@ -67,6 +67,8 @@ async function main(channel) {
     sendDBSize(); // Отправить статистику первый раз
     setInterval(async () => sendDBSize(), 300000); // 300 сек = 5 мин
 
+    checkTsidUnique('mainlog');
+
     channel.on('message', ({ id, type, query, payload }) => {
       if (type == 'write') return write(id, query, payload);
       if (type == 'read') return read(id, query);
@@ -90,6 +92,39 @@ async function main(channel) {
     const result = await client.query(getGroupQuery(name));
     logger.log(name + ' group: ' + util.inspect(result));
   }
+
+
+  async function checkTsidUnique(tableName) {
+    try {
+      const sql = 'SELECT Count (tsid) count, tsid from ' + tableName + ' group by tsid having Count (tsid)>1';
+      const result = await client.query(sql);
+
+      if (result.length > 0) {
+        logger.log('checkTsidUnique result length = ' + result.length);
+        for (let rec of result) {
+          const selSql = `SELECT rowid, tsid, ts from ${tableName} WHERE tsid = '${rec.tsid}'`;
+          logger.log(selSql);
+          const resx = await client.query(selSql);
+          logger.log('tsid = ' + rec.tsid + ' result=' + util.inspect(resx));
+          if (!resx || !resx.length) continue;
+
+          let idx = 1;
+          for (let recx of resx) {
+            let newTsid = String(recx.ts) + '_' + String(idx).padStart(5, '0');
+            idx += 1;
+            const upSql = `UPDATE ${tableName} SET tsid='${newTsid}' WHERE rowid = ${recx.rowid}`;
+            await client.query(upSql);
+            logger.log('Update ' + rec.tsid + 'to ' + newTsid);
+          }
+        }
+      } else {
+        logger.log('checkTsidUnique OK');
+      }
+    } catch (err) {
+      logger.log('ERROR: checkTsidUnique ' + util.inspect(err));
+    }
+  }
+
 
   /**
    *
