@@ -30,6 +30,7 @@ try {
 const logfile = opt.logfile || path.join(__dirname, 'ih_sqlite3_logagent.log');
 const loglevel = opt.loglevel || 0;
 const maxlogrecords = opt.maxlogrecords || 100000;
+let stmtMainlog = {};
 logger.start(logfile, loglevel);
 logger.log('Start logagent sqlite3. Options: ' + JSON.stringify(opt));
 
@@ -54,16 +55,16 @@ async function main(channel) {
     await client.run('PRAGMA journal_mode = WAL;');
     await client.run('PRAGMA synchronous = NORMAL;');
     await client.run('PRAGMA auto_vacuum = FULL;');
-    
+
     for (const name of tableNames) {
       try {
         await client.createTable(getCreateTableStr(name), name);
         await client.run('CREATE INDEX IF NOT EXISTS ' + name + '_ts ON ' + name + ' (tsid);');
       } catch (e) {
-        logger.log('ERROR: '+util.inspect(e));
+        logger.log('ERROR: ' + util.inspect(e));
       }
     }
-
+    stmtMainlog = client.pool.prepare("INSERT INTO mainlog (tags, did, location, txt, level, ts, tsid, sender) VALUES (?,?,?,?,?,?,?,?)");
     sendDBSize(); // Отправить статистику первый раз
     setInterval(async () => sendDBSize(), 300000); // 300 сек = 5 мин
 
@@ -74,12 +75,20 @@ async function main(channel) {
       if (type == 'read') return read(id, query);
       if (type == 'run') return run(id, query);
       if (type == 'settings') return del(payload);
+      //exit agent
+      if (type == 'stop') return processExit(0);
     });
 
     process.on('SIGTERM', () => {
       logger.log('Received SIGTERM');
       processExit(0);
     });
+
+    if (logger.onStop) {
+      logger.onStop(() => {
+        processExit(0);
+      });
+    }
 
     process.on('exit', () => {
       if (client && client.pool) client.pool.close();
@@ -133,17 +142,31 @@ async function main(channel) {
    * @param {Array of Objects} payload - [{ dn, prop, ts, val }]
    */
   async function write(id, queryObj, payload) {
-   
+
     const table = queryObj && queryObj.table ? queryObj.table : 'mainlog';
-    const columns = getColumns(table);
-    const values = utils.formValues(payload, columns);
-    if (!values || !values.length) return;
-
-    const values1 = values.map(i => `(${i})`).join(', ');
-    const sql = 'INSERT INTO ' + table + ' (' + columns.join(',') + ') VALUES ' + values1;
-
+    let changes = 0;
     try {
-      const changes = await client.run(sql);
+
+      if (table == 'mainlog') {
+        if (!payload || !payload.length) return;
+        client.pool.serialize(function () {
+          client.pool.run("BEGIN");
+          for (let i = 0; i < payload.length; i++) {
+            let value = payload[i];
+            stmtMainlog.run(value.tags, value.did, value.location, value.txt, value.level, value.ts, value.tsid, value.sender);
+          }
+          client.pool.run("COMMIT");
+        });
+      } else {
+        const columns = getColumns(table);
+        const values = utils.formValues(payload, columns);
+        if (!values || !values.length) return;
+        const values1 = values.map(i => `(${i})`).join(', ');
+        const sql = 'INSERT INTO ' + table + ' (' + columns.join(',') + ') VALUES ' + values1;
+        changes = await client.run(sql);
+      }
+
+
       logger.log('Write query id=' + id + ', changes=' + changes, 2);
     } catch (err) {
       sendError(id, err);
@@ -232,17 +255,22 @@ async function main(channel) {
   function processExit(code, err) {
     let msg = '';
     if (err) msg = 'ERROR: ' + utils.getShortErrStr(err) + ' ';
-
+    stmtMainlog.finalize();
     if (client && client.pool) {
-      client.pool.close();
-      client.pool = null;
-      msg += 'Close connection pool.';
-    }
+      client.pool.close((err) => {
+        if (err) {
+          msg += util.inspect(err, null, 4);
+        } else {
+          msg += 'Close connection pool.';
+        }
+        client.pool = null;
+        logger.log(msg + ' Exit with code: ' + code);
 
-    logger.log(msg + ' Exit with code: ' + code);
-    setTimeout(() => {
-      channel.exit(code);
-    }, 500);
+        setTimeout(() => {
+          channel.exit(code);
+        }, 500);
+      });
+    }
   }
 
   async function sendDBSize() {
@@ -316,8 +344,8 @@ function getColumns(tableName) {
       return ['unit', 'txt', 'level', 'ts', 'tsid', 'sender'];
 
     case 'iseclog':
-        return ['type', 'msg', 'subjid', 'subjname','objid', 'objname','result','changed','ip','app','class','version','level', 'ts', 'tsid', 'sender'];
-     
+      return ['type', 'msg', 'subjid', 'subjname', 'objid', 'objname', 'result', 'changed', 'ip', 'app', 'class', 'version', 'level', 'ts', 'tsid', 'sender'];
+
     default:
       return ['tags', 'did', 'location', 'txt', 'level', 'ts', 'tsid', 'sender'];
   }
