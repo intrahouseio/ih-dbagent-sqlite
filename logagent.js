@@ -64,7 +64,9 @@ async function main(channel) {
         logger.log('ERROR: ' + util.inspect(e));
       }
     }
-    stmtMainlog = client.pool.prepare("INSERT INTO mainlog (tags, did, location, txt, level, ts, tsid, sender) VALUES (?,?,?,?,?,?,?,?)");
+    stmtMainlog = client.pool.prepare(
+      'INSERT INTO mainlog (tags, did, location, txt, level, ts, tsid, sender) VALUES (?,?,?,?,?,?,?,?)'
+    );
     sendDBSize(); // Отправить статистику первый раз
     setInterval(async () => sendDBSize(), 300000); // 300 сек = 5 мин
 
@@ -75,7 +77,7 @@ async function main(channel) {
       if (type == 'read') return read(id, query);
       if (type == 'run') return run(id, query);
       if (type == 'settings') return del(payload);
-      //exit agent
+      // exit agent
       if (type == 'stop') return processExit(0);
     });
 
@@ -101,7 +103,6 @@ async function main(channel) {
     const result = await client.query(getGroupQuery(name));
     logger.log(name + ' group: ' + util.inspect(result));
   }
-
 
   async function checkTsidUnique(tableName) {
     try {
@@ -134,7 +135,6 @@ async function main(channel) {
     }
   }
 
-
   /**
    *
    * @param {String} id - request uuid
@@ -142,20 +142,18 @@ async function main(channel) {
    * @param {Array of Objects} payload - [{ dn, prop, ts, val }]
    */
   async function write(id, queryObj, payload) {
-
     const table = queryObj && queryObj.table ? queryObj.table : 'mainlog';
     let changes = 0;
     try {
-
       if (table == 'mainlog') {
         if (!payload || !payload.length) return;
-        client.pool.serialize(function () {
-          client.pool.run("BEGIN");
+        client.pool.serialize(() => {
+          client.pool.run('BEGIN');
           for (let i = 0; i < payload.length; i++) {
             let value = payload[i];
             stmtMainlog.run(value.tags, value.did, value.location, value.txt, value.level, value.ts, value.tsid, value.sender);
           }
-          client.pool.run("COMMIT");
+          client.pool.run('COMMIT');
         });
       } else {
         const columns = getColumns(table);
@@ -165,7 +163,6 @@ async function main(channel) {
         const sql = 'INSERT INTO ' + table + ' (' + columns.join(',') + ') VALUES ' + values1;
         changes = await client.run(sql);
       }
-
 
       logger.log('Write query id=' + id + ', changes=' + changes, 2);
     } catch (err) {
@@ -257,7 +254,7 @@ async function main(channel) {
     if (err) msg = 'ERROR: ' + utils.getShortErrStr(err) + ' ';
     stmtMainlog.finalize();
     if (client && client.pool) {
-      client.pool.close((err) => {
+      client.pool.close(err => {
         if (err) {
           msg += util.inspect(err, null, 4);
         } else {
@@ -275,35 +272,40 @@ async function main(channel) {
 
   async function sendDBSize() {
     if (!process.connected) return;
+   
+    try {
+      let fileSize = 0;
+      const data = {};
+      let stats = await fs.stat(opt.dbPath);
+      fileSize = stats.size / 1048576;
+      stats = await fs.stat(opt.dbPath + '-shm');
+      fileSize += stats.size / 1048576;
+      stats = await fs.stat(opt.dbPath + '-wal');
+      fileSize += stats.size / 1048576;
+      data.size = Math.round(fileSize * 100) / 100;
 
-    const data = {};
-    let stats = await fs.stat(opt.dbPath);
-    let fileSize = stats['size'] / 1048576;
-    stats = await fs.stat(opt.dbPath + '-shm');
-    fileSize = fileSize + stats['size'] / 1048576;
-    stats = await fs.stat(opt.dbPath + '-wal');
-    fileSize = fileSize + stats['size'] / 1048576;
-    data.size = Math.round(fileSize * 100) / 100;
+      const needDelete = [];
+      for (const name of tableNames) {
+        // const result = await client.query('SELECT Count (*) count From ' + name);
+        // const count = result ? result[0].count : 0;
+        const count = await getTableRecordsCount(name);
+        // if (count > 1000) {
+        //  await showGroups(name);
+        // }
+        data[name] = count;
+        if (maxlogrecords > 0 && count > maxlogrecords && name != 'mainlog') needDelete.push(name);
+      }
 
-    const needDelete = [];
-    for (const name of tableNames) {
-      // const result = await client.query('SELECT Count (*) count From ' + name);
-      // const count = result ? result[0].count : 0;
-      const count = await getTableRecordsCount(name);
-      // if (count > 1000) {
-      //  await showGroups(name);
-      // }
-      data[name] = count;
-      if (maxlogrecords > 0 && count > maxlogrecords && name != 'mainlog') needDelete.push(name);
-    }
+      // Отправить фактическое состояние
+      if (process.connected) process.send({ type: 'procinfo', data });
 
-    // Отправить фактическое состояние
-    if (process.connected) process.send({ type: 'procinfo', data });
+      if (!needDelete.length) return;
 
-    if (!needDelete.length) return;
-
-    for (const name of needDelete) {
-      await deleteRecordsMax(name);
+      for (const name of needDelete) {
+        await deleteRecordsMax(name);
+      }
+    } catch (e) {
+      logger.log('sendDBSize ERROR: '+util.inspect(e));
     }
   }
 
@@ -326,7 +328,8 @@ function getCreateTableStr(tableName) {
       break;
 
     case 'iseclog':
-      result = 'type TEXT, msg TEXT, subjid TEXT, subjname TEXT, result TEXT, changed TEXT, ip TEXT, class TEXT, app TEXT, version TEXT, objid TEXT, objname TEXT, level INTEGER, ts INTEGER NOT NULL, tsid TEXT,sender TEXT';
+      result =
+        'type TEXT, msg TEXT, subjid TEXT, subjname TEXT, result TEXT, changed TEXT, ip TEXT, class TEXT, app TEXT, version TEXT, objid TEXT, objname TEXT, level INTEGER, ts INTEGER NOT NULL, tsid TEXT,sender TEXT';
       break;
 
     default:
@@ -344,7 +347,24 @@ function getColumns(tableName) {
       return ['unit', 'txt', 'level', 'ts', 'tsid', 'sender'];
 
     case 'iseclog':
-      return ['type', 'msg', 'subjid', 'subjname', 'objid', 'objname', 'result', 'changed', 'ip', 'app', 'class', 'version', 'level', 'ts', 'tsid', 'sender'];
+      return [
+        'type',
+        'msg',
+        'subjid',
+        'subjname',
+        'objid',
+        'objname',
+        'result',
+        'changed',
+        'ip',
+        'app',
+        'class',
+        'version',
+        'level',
+        'ts',
+        'tsid',
+        'sender'
+      ];
 
     default:
       return ['tags', 'did', 'location', 'txt', 'level', 'ts', 'tsid', 'sender'];
