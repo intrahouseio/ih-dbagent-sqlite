@@ -6,17 +6,16 @@ const util = require('util');
 const fs = require('fs');
 const path = require('path');
 
-// const countOfNewest = 2;
-
 module.exports = {
   loglevel: 0,
   currentFileSize: 0,
   stream: null,
 
-  start(logfileName, level, sizeKB) {
+  start(logfileName, loglevel, sizeKB) {
+    this.loglevel = Number(loglevel) > 0 ? Number(loglevel) : 0;
     this.logfileName = logfileName;
-    this.setLoglevel(level || 0);
-    this.fileSize = (Number(sizeKB) > 0 ? Number(sizeKB) : 512) * 1024;
+    this.fileSize = (Number(sizeKB) > 0 ? Number(sizeKB) : 128) * 1024;
+    this.logrotate = 2;
 
     this.currentFileSize = fs.existsSync(logfileName) ? this.getCurrentFileSize(logfileName) : 0;
     this.stream = createStream(logfileName);
@@ -29,12 +28,17 @@ module.exports = {
     }
   },
 
+  /*
+  // НЕ ИСПОЛЬЗУЕТСЯ
   setParams(params) {
     if (!params || typeof params != 'object') return;
+    if (+params.loglevel > 0) this.loglevel = +params.loglevel;
+    
     if (params.logsize > 0) this.fileSize = params.logsize *1024;
     // Есть плагины без этих параметров
     if (params.logrotate != undefined && params.logrotate >=0) this.logrotate = params.logrotate;
   },
+  */
 
   getCurrentFileSize(file) {
     let fileSize = 0;
@@ -47,9 +51,10 @@ module.exports = {
   },
 
   // level: 0 - низкий уровень (пишется всегда), 1 -средний уровень, 2 - высокий уровень
-  log(msg, level, loglevel) {
+  // log(msg, level, loglevel) {
+  log(msg, level) {
     if (!this.stream) return;
-    if (level && loglevel < level) return;
+    if (level && this.loglevel < level) return;
 
     const str = typeof msg == 'object' ? 'ERROR: ' + util.inspect(msg) : msg;
     this.write(getDateStr() + ' ' + str + '\r\n');
@@ -89,11 +94,6 @@ module.exports = {
     });
   },
 
-  setLoglevel(level) {
-    this.loglevel = level;
-    this.log('Log level: ' + level);
-  },
-
   async removeOldFiles() {
     let warnMsg;
     const countOfNewest = this.logrotate != undefined ? this.logrotate : 2;
@@ -107,8 +107,8 @@ module.exports = {
         return;
       }
 
-      const name = path.basename(this.logfileName); // ih_emuls1.log
-      // ih_emuls1.log.1726821367707
+      const name = path.basename(this.logfileName); // ih_sqlite.log
+      // ih_sqlite.log.1726821367707
       let res = arr.filter(file => file.startsWith(name) && isStringMatch(getFileExt(file), /[0-9]/));
       if (res.length <= 0) return;
 

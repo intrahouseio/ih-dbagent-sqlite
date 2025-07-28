@@ -3,7 +3,7 @@
  * Точка входа при запуске дочернего процесса
  * Входной параметр - путь к файлу конфигурации или сама конфигурация как строка JSON
  * В данном случае ожидается JSON
- * 
+ *
  */
 
 // const util = require('util');
@@ -22,10 +22,10 @@ try {
   opt = {};
 }
 
-const logfile = opt.logfile || path.join(__dirname,'ih_sqlite3.log');
-const loglevel = opt.loglevel || 0;
+const logfile = opt.logfile || path.join(__dirname, 'ih_sqlite3.log');
+const loglevel = opt.loglevel;
 
-logger.start(logfile,loglevel);
+logger.start(logfile, loglevel);
 
 logger.log('Start dbagent sqlite3. Options: ' + JSON.stringify(opt));
 
@@ -38,12 +38,9 @@ dbagent(process, opt, logger);
 
 function sendProcessInfo() {
   const mu = process.memoryUsage();
-  const memrss = Math.floor(mu.rss/1024);
-  const memheap = Math.floor(mu.heapTotal/1024);
-  const memhuse = Math.floor(mu.heapUsed/1024);
+  const memrss = Math.floor(mu.rss / 1024);
+  const memheap = Math.floor(mu.heapTotal / 1024);
+  const memhuse = Math.floor(mu.heapUsed / 1024);
 
-  if (process.connected) process.send({type:'procinfo', data:{memrss,memheap, memhuse }});
+  if (process.connected) process.send({ type: 'procinfo', data: { memrss, memheap, memhuse } });
 }
-
-
-

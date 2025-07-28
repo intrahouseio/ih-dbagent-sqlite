@@ -110,12 +110,11 @@ async function main(channel) {
       const result = await client.query(sql);
 
       if (result.length > 0) {
-        logger.log('checkTsidUnique result length = ' + result.length);
         for (let rec of result) {
           const selSql = `SELECT rowid, tsid, ts from ${tableName} WHERE tsid = '${rec.tsid}'`;
-          logger.log(selSql);
+          logger.log(selSql, 1);
           const resx = await client.query(selSql);
-          logger.log('tsid = ' + rec.tsid + ' result=' + util.inspect(resx));
+          logger.log('tsid = ' + rec.tsid + ' result=' + util.inspect(resx), 2);
           if (!resx || !resx.length) continue;
 
           let idx = 1;
@@ -128,7 +127,7 @@ async function main(channel) {
           }
         }
       } else {
-        logger.log('checkTsidUnique OK');
+        logger.log('checkTsidUnique OK', 1);
       }
     } catch (err) {
       logger.log('ERROR: checkTsidUnique ' + util.inspect(err));
